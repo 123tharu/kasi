@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { DemoBackend } from '../data/backend'
 import { DEMO_ONLY, loadConfig, saveConfig, setupLink } from '../data/config'
 import { useStore } from '../data/store'
+import { repairApp } from '../ui/ErrorBoundary'
 import { parseSms, bankByCode } from '../lib/parser'
 import { fmt } from '../lib/money'
 import { Button, Card, cx, Field, Input, inputCls, PageTitle, Select, SectionTitle } from '../ui/ui'
@@ -312,6 +313,9 @@ export function Settings() {
       <Card className="p-2">
         <button onClick={exportCsv} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left hover:bg-card2/60">
           <Download size={18} className="text-muted" /> Export transactions (CSV)
+        </button>
+        <button onClick={repairApp} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left hover:bg-card2/60">
+          <RotateCcw size={18} className="text-muted" /> Repair app (load the latest version)
         </button>
         {backend.kind === 'demo' ? (
           <>

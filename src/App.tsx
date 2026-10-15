@@ -16,6 +16,7 @@ import { More, Settings, SmsSetup } from './screens/More'
 import { Review } from './screens/Review'
 import { Subscriptions } from './screens/Subscriptions'
 import { Timeline } from './screens/Timeline'
+import { ErrorBoundary, repairApp } from './ui/ErrorBoundary'
 import { Button, cx, Field, Input } from './ui/ui'
 
 const NAV = [
@@ -75,6 +76,7 @@ function Shell() {
       </aside>
 
       <main className="safe-top min-w-0 flex-1 px-4 pb-32 pt-4 md:px-10 md:pb-16 md:pt-8">
+        <ErrorBoundary resetKey={loc.pathname}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/insights" element={<Insights />} />
@@ -90,6 +92,7 @@ function Shell() {
           <Route path="/more/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+        </ErrorBoundary>
       </main>
 
       {/* Phone bottom bar */}
@@ -135,6 +138,9 @@ function Loading({ error, onRetry }: { error?: string | null; onRetry?: () => vo
             <Button className="mt-5" onClick={onRetry ?? (() => location.reload())}>
               Try again
             </Button>
+            <button className="mt-3 text-sm text-muted underline" onClick={repairApp}>
+              Repair app
+            </button>
           </>
         ) : (
           <div className="mt-4 text-sm text-muted">Loading…</div>
