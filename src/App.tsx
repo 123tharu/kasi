@@ -41,7 +41,10 @@ function Logo({ className }: { className?: string }) {
 function Shell() {
   const { reviewCount, toastMsg, backend } = useStore()
   const loc = useLocation()
-  useEffect(() => window.scrollTo(0, 0), [loc.pathname])
+  // Braces matter: newer Chrome returns a Promise from scrollTo, and React would treat it as a cleanup function.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [loc.pathname])
   return (
     <div className="mx-auto flex min-h-dvh max-w-6xl">
       {/* Laptop sidebar */}
