@@ -152,13 +152,13 @@ export function SmsSetup() {
         </Step>
         <Step n={2} title="Create a macro: trigger">
           <p>
-            Add Macro → <b>Triggers</b> → Phone/SMS → <b>SMS Received</b> → From: <b>Any number</b>. Content: choose <b>Matches</b> (tick <i>regex</i>) and enter:
+            Add Macro → <b>Triggers</b> → Phone → <b>SMS Received</b> → From: <b>Any number</b>, Content: <b>Any</b>.
           </p>
-          <CopyField label="Only forward money messages" value="(?is).*(LKR|Rs\.?|USD).*" />
+          <p>One macro covers every bank and card. Kasi keeps only messages with an amount; personal texts, promos and OTPs are dropped before anything is saved.</p>
         </Step>
         <Step n={3} title="Action: send it to Kasi">
           <p>
-            <b>Actions</b> → Connectivity → <b>HTTP Request</b>. Method <b>POST</b>, then fill in:
+            <b>Actions</b> → Web Interactions (or Connectivity) → <b>HTTP Request</b>. Method <b>POST</b>, then fill in:
           </p>
           <CopyField label="URL" value={url} />
           <p>

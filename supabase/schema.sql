@@ -181,6 +181,11 @@ begin
   if kasi_is_sensitive(p_body) then
     return 'ignored';
   end if;
+  -- Only money messages are kept: personal texts and promos without an amount are never stored.
+  if p_body !~* '(\mlkr|\mslr|\mrs\.?|\musd|us\$|\meur|\mgbp|\maud|\msgd|\minr|\maed)\s*[:.]?\s*[0-9]'
+     and p_body !~* '[0-9](\.[0-9]{1,2})?\s*(lkr|usd)\M' then
+    return 'ignored';
+  end if;
   -- de-duplicate: same sender + body within 10 minutes
   if exists (select 1 from raw_sms where user_id = uid and body = p_body
              and coalesce(sender,'') = coalesce(p_sender,'')
