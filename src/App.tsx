@@ -194,7 +194,7 @@ function SignIn({ sb, onReset }: { sb: SupabaseClient; onReset: () => void }) {
   async function go() {
     setBusy(true)
     setMsg(null)
-    const r = mode === 'in' ? await sb.auth.signInWithPassword({ email, password: pw }) : await sb.auth.signUp({ email, password: pw })
+    const r = mode === 'in' ? await sb.auth.signInWithPassword({ email, password: pw }) : await sb.auth.signUp({ email, password: pw, options: { emailRedirectTo: location.origin + location.pathname } })
     setBusy(false)
     if (r.error) return setMsg(r.error.message)
     if (mode === 'up' && !r.data.session) setMsg('Check your email to confirm, then sign in here.')
