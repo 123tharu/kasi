@@ -28,14 +28,7 @@ const NAV = [
 ]
 
 function Logo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 48 48" className={className} aria-hidden>
-      <rect x="4" y="4" width="18" height="18" rx="5" fill="#2f5a27" />
-      <rect x="26" y="4" width="18" height="24" rx="5" fill="#86d16f" />
-      <rect x="4" y="26" width="18" height="18" rx="5" fill="#86d16f" />
-      <rect x="26" y="32" width="18" height="12" rx="5" fill="#2f5a27" />
-    </svg>
-  )
+  return <img src="./icon-192.png" alt="" className={cx('rounded-[24%]', className)} />
 }
 
 function Shell() {
