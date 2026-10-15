@@ -48,6 +48,7 @@ export function More() {
       </Card>
       <Card className="mt-4 p-2">
         <Row to="/more/sms" icon="📲" title="Auto-tracking setup" sub="Forward bank SMS from your phone" />
+        <Row to="/more/import" icon="📥" title="Import past SMS" sub="Add bank messages from before setup" />
         <Row to="/more/settings" icon="⚙️" title="Settings" sub="Payday, connect devices, export" />
       </Card>
     </div>

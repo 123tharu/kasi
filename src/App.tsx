@@ -10,6 +10,7 @@ import { Accounts } from './screens/Accounts'
 import { Budgets } from './screens/Budgets'
 import { Categories } from './screens/Categories'
 import { Grow } from './screens/Grow'
+import { ImportSms } from './screens/Import'
 import { Home } from './screens/Home'
 import { Insights } from './screens/Insights'
 import { More, Settings, SmsSetup } from './screens/More'
@@ -63,6 +64,7 @@ function Shell() {
             ['/more/accounts', '🏦 Accounts'],
             ['/more/review', '🔍 Review'],
             ['/more/sms', '📲 Auto-tracking'],
+            ['/more/import', '📥 Import past SMS'],
           ].map(([to, l]) => (
             <NavLink key={to} to={to} className={({ isActive }) => cx('block rounded-full px-4 py-2 transition', isActive ? 'text-ink' : 'text-muted hover:text-ink')}>
               {l}
@@ -85,6 +87,7 @@ function Shell() {
           <Route path="/more/categories" element={<Categories />} />
           <Route path="/more/review" element={<Review />} />
           <Route path="/more/sms" element={<SmsSetup />} />
+          <Route path="/more/import" element={<ImportSms />} />
           <Route path="/more/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

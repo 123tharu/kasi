@@ -260,6 +260,35 @@ export function isSensitive(text: string): boolean {
   return SENSITIVE.some((r) => r.test(text))
 }
 
+const BANKISH = /(debit|credit|card|a\/c|\bacc?\b|account|purchase|transaction|\btxn|withdraw|transfer|payment|\bpmt\b|deposit|remittance|balance|\bbal\b|\bavl|authori[sz]ed|approved|ceft|slips)/i
+
+/** Same rule as the server: an amount AND bank wording. "Bring Rs.500 for the cake" is not a bank alert. */
+export function hasMoney(text: string): boolean {
+  const amount = /(?<![a-z])(lkr|slr|rs\.?|usd|us\$|eur|gbp|aud|sgd|inr|aed)\s*[:.]?\s*\d/i.test(text) || /\d(\.\d{1,2})?\s*(lkr|usd)\b/i.test(text)
+  return amount && BANKISH.test(text)
+}
+
+export interface ImportedSms {
+  sender: string | null
+  body: string
+  received_at: string
+}
+
+/** Reads an "SMS Backup & Restore" XML export (received messages only). */
+export function parseSmsBackupXml(xml: string): ImportedSms[] {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml')
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('This file is not an SMS Backup & Restore XML file.')
+  const out: ImportedSms[] = []
+  for (const el of Array.from(doc.getElementsByTagName('sms'))) {
+    if (el.getAttribute('type') && el.getAttribute('type') !== '1') continue // 1 = received
+    const body = el.getAttribute('body') ?? ''
+    const ms = Number(el.getAttribute('date'))
+    if (!body || !ms) continue
+    out.push({ sender: el.getAttribute('address'), body, received_at: new Date(ms).toISOString() })
+  }
+  return out
+}
+
 // ---------- main ----------
 
 export function parseSms(body: string, sender: string | null, received: Date = new Date()): ParseResult {
@@ -270,6 +299,8 @@ export function parseSms(body: string, sender: string | null, received: Date = n
   if (/\b(declined|unsuccessful|not successful|failed|insufficient|rejected|could not be processed)\b/i.test(text)) {
     return { kind: 'ignore', reason: 'Declined / failed transaction' }
   }
+
+  if (!BANKISH.test(text)) return { kind: 'ignore', reason: 'Not a bank alert' }
 
   const money = findMoney(text)
   const amounts = money.filter((m) => m.label === 'amount')

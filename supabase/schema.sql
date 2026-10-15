@@ -186,6 +186,10 @@ begin
      and p_body !~* '[0-9](\.[0-9]{1,2})?\s*(lkr|usd)\M' then
     return 'ignored';
   end if;
+  -- ...and it must read like a bank alert, not a friend saying "bring Rs.500".
+  if p_body !~* '(debit|credit|card|a/c|\macc?\M|account|purchase|transaction|\mtxn|withdraw|transfer|payment|\mpmt\M|deposit|remittance|balance|\mbal\M|\mavl|authori[sz]ed|approved|ceft|slips)' then
+    return 'ignored';
+  end if;
   -- de-duplicate: same sender + body within 10 minutes
   if exists (select 1 from raw_sms where user_id = uid and body = p_body
              and coalesce(sender,'') = coalesce(p_sender,'')

@@ -18,6 +18,7 @@ interface StoreValue {
   deleteTransaction(tx: Transaction): Promise<void>
   learnRule(merchant: string, categoryId: string): Promise<number>
   addSms(body: string, sender?: string | null): Promise<void>
+  importSms(list: { sender: string | null; body: string; received_at: string }[], onProgress?: (done: number) => void): Promise<{ added: number; alreadyHad: number }>
   processInbox(): Promise<void>
   mergeAccounts(from: Account, into: Account): Promise<void>
   reload(): Promise<void>
@@ -279,6 +280,30 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
     [insert],
   )
 
+  /** Adds past bank SMS (already filtered for money / OTPs by the caller). Skips ones Kasi already has. */
+  const importSms = useCallback(
+    async (list: { sender: string | null; body: string; received_at: string }[], onProgress?: (done: number) => void) => {
+      const key = (s: { sender: string | null; body: string }) => `${(s.sender ?? '').toLowerCase()}|${s.body.replace(/\s+/g, ' ').trim()}`
+      const have = new Set((dbRef.current?.raw_sms ?? []).map(key))
+      const fresh: typeof list = []
+      for (const s of list) {
+        const k = key(s)
+        if (have.has(k)) continue
+        have.add(k)
+        fresh.push(s)
+      }
+      for (let i = 0; i < fresh.length; i += 100) {
+        await insert(
+          'raw_sms',
+          fresh.slice(i, i + 100).map((s) => ({ ...s, body: s.body.trim().slice(0, 2000), status: 'new' as const })),
+        )
+        onProgress?.(Math.min(fresh.length, i + 100))
+      }
+      return { added: fresh.length, alreadyHad: list.length - fresh.length }
+    },
+    [insert],
+  )
+
   const mergeAccounts = useCallback(
     async (from: Account, into: Account) => {
       const d = dbRef.current!
@@ -311,6 +336,7 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
     deleteTransaction,
     learnRule,
     addSms,
+    importSms,
     processInbox,
     mergeAccounts,
     reload,
