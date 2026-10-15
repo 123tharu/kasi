@@ -82,6 +82,24 @@ describe('Generic formats (ComBank / HNB / BOC / People\'s style)', () => {
   })
 })
 
+describe('Real samples from your phone', () => {
+  it('ComBank debit card purchase, forwarded 5 days later', () => {
+    const rx = new Date(2026, 9, 15, 13, 31, 42)
+    const r = txn('Dear Cardholder, Purchase at UBER EATS 852 LK for LKR 2,765.62 on 10/10/26 01:23 PM has been authorised on your debit card ending #5370.', 'COMBANK', rx)
+    expect(r).toMatchObject({ amount: 2765.62, direction: 'debit', merchant: 'Uber Eats', last4: '5370', bank: 'COMBANK' })
+    expect(r.occurredAt.getDate()).toBe(10)
+    expect(r.occurredAt.getMonth()).toBe(9)
+    expect(r.occurredAt.getHours()).toBe(13)
+    expect(r.occurredAt.getMinutes()).toBe(23)
+  })
+  it('an amount like 1.00 is not read as a time', () => {
+    const rx = new Date(2026, 9, 15, 12, 18, 30)
+    const r = txn('LKR 1.00 debited from AC **0000 for TEST SHOP\n15/10/2026 12:18:00\nTo Inq Call 0112303050', 'SAMPATHTXN', rx)
+    expect(r.occurredAt.getHours()).toBe(12)
+    expect(r.occurredAt.getMinutes()).toBe(18)
+  })
+})
+
 describe('Ignored messages', () => {
   const ignored = [
     'Your OTP for the transaction of LKR 5,000.00 at DARAZ is 482913. Do not share this with anyone.',

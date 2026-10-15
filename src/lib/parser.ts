@@ -120,6 +120,8 @@ function cleanMerchant(raw: string): string | null {
   s = s.replace(/[\s.,:;\-*]+$/, '')
   s = s.replace(/\s*@\s*\d+$/, '').replace(/\s+-\s*\d{4,}$/, '')
   s = s.replace(/\s+(lk|lka|sri\s*lanka|colombo\s*\d{1,2})$/i, '')
+  // store / terminal codes at the end: "UBER EATS 852" → "UBER EATS"
+  s = s.replace(/(\s+#?\d{2,8})+$/, '')
   s = s.replace(/\s{2,}/g, ' ').trim()
   if (s.length < 2) return null
   if (/^(your|a\/c|ac\b|acc|account|card|crd|cardholder|customer|x{2,}|\*|\d|lkr|rs\.?\b|usd|any\b|more\b|info|inquir|enquir|further|details|banking|us\b|inq|enq|call\b|get\b|for\b)/i.test(s)) return null
@@ -195,11 +197,23 @@ function findDate(body: string, received: Date): Date {
     const y = m[3] ? year4(+m[3]) : received.getFullYear()
     candidates.push(new Date(y, MONTHS.indexOf(m[2].toLowerCase()), +m[1]))
   }
-  const valid = candidates.filter((d) => !isNaN(d.getTime()) && Math.abs(d.getTime() - received.getTime()) < 4 * 86400000)
+  // Trust the date printed in the SMS when it's plausible: up to 60 days old (forwarded or pasted
+  // late) and at most a day ahead of when we received it.
+  const valid = candidates.filter((d) => {
+    const diff = d.getTime() - received.getTime()
+    return !isNaN(d.getTime()) && diff > -60 * 86400000 && diff < 86400000
+  })
   if (!valid.length) return received
   valid.sort((x, y) => Math.abs(x.getTime() - received.getTime()) - Math.abs(y.getTime() - received.getTime()))
   const d = valid[0]
-  const t = body.match(/\b(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?\s*(am|pm)?\b/i)
+  // A time is hh:mm[:ss] [am/pm], or hh.mm only with am/pm. Never part of an amount ("LKR 1.00").
+  let t: RegExpMatchArray | null = null
+  for (const m of body.matchAll(/\b(\d{1,2})(?::(\d{2})(?::(\d{2}))?\s*(am|pm)?|\.(\d{2})\s*(am|pm))\b/gi)) {
+    const before = body.slice(Math.max(0, m.index! - 6), m.index!)
+    if (/(lkr|rs\.?|usd|[,.])\s*$/i.test(before)) continue
+    t = [m[0], m[1], m[2] ?? m[5], m[3], m[4] ?? m[6]] as unknown as RegExpMatchArray
+    break
+  }
   if (t) {
     let h = +t[1]
     const min = +t[2]
