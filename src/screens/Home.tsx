@@ -52,7 +52,7 @@ export function relTime(d: Date) {
 }
 
 export function Home() {
-  const { db, cats, reviewCount } = useStore()
+  const { db, cats, reviewCount, backend } = useStore()
   const nav = useNavigate()
   const [edit, setEdit] = useState<Transaction | null>(null)
   const [adding, setAdding] = useState(false)
@@ -83,7 +83,10 @@ export function Home() {
     <div>
       <div className="mb-5 flex items-center justify-between pt-2">
         <div>
-          <div className="text-sm text-muted">{greeting()},</div>
+          <div className="flex items-center gap-2 text-sm text-muted">
+            {greeting()},
+            {backend.kind === 'demo' && <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn">Demo data</span>}
+          </div>
           <h1 className="text-[28px] font-semibold tracking-tight">{s.display_name || 'there'}</h1>
         </div>
         <button onClick={() => setAdding(true)} className="flex h-11 w-11 items-center justify-center rounded-full bg-ink text-bg transition active:scale-95 md:hidden" aria-label="Add transaction">

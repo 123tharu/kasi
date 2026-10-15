@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { DemoBackend } from '../data/backend'
-import { loadConfig, saveConfig, setupLink } from '../data/config'
+import { DEMO_ONLY, loadConfig, saveConfig, setupLink } from '../data/config'
 import { useStore } from '../data/store'
 import { parseSms, bankByCode } from '../lib/parser'
 import { fmt } from '../lib/money'
@@ -322,15 +322,17 @@ export function Settings() {
             >
               <RotateCcw size={18} className="text-muted" /> Reset demo data
             </button>
-            <button
-              onClick={() => {
-                saveConfig(null)
-                location.reload()
-              }}
-              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left hover:bg-card2/60"
-            >
-              <LogOut size={18} className="text-muted" /> Leave demo and connect my database
-            </button>
+            {!DEMO_ONLY && (
+              <button
+                onClick={() => {
+                  saveConfig(null)
+                  location.reload()
+                }}
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left hover:bg-card2/60"
+              >
+                <LogOut size={18} className="text-muted" /> Leave demo and connect my database
+              </button>
+            )}
           </>
         ) : (
           <>

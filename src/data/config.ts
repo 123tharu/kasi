@@ -29,7 +29,10 @@ function readSetupHash(): AppConfig | null {
   return null
 }
 
+export const DEMO_ONLY = !!import.meta.env.VITE_DEMO_ONLY
+
 export function loadConfig(): AppConfig | null {
+  if (DEMO_ONLY) return { mode: 'demo' }
   const fromHash = readSetupHash()
   if (fromHash) return fromHash
   const ls = readLS()
