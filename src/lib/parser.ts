@@ -54,6 +54,8 @@ export type ParseResult =
       kind: 'txn'
       amount: number
       currency: string
+      /** When a foreign-currency SMS also states the rupee amount, e.g. "USD 11.99 (LKR 3,650.00)" */
+      lkrAmount: number | null
       direction: Direction
       directionGuessed: boolean
       merchant: string | null
@@ -122,6 +124,8 @@ function cleanMerchant(raw: string): string | null {
   s = s.replace(/\s+(lk|lka|sri\s*lanka|colombo\s*\d{1,2})$/i, '')
   // store / terminal codes at the end: "UBER EATS 852" → "UBER EATS"
   s = s.replace(/(\s+#?\d{2,8})+$/, '')
+  // payment-processor codes: "SPOTIFY P2F3", "UBER *TRIP X7Q2"
+  s = s.replace(/(\s+(?=[a-z*]*\d)(?=\d*[a-z])[a-z0-9*]{3,8})+$/i, '').replace(/\s*\*\s*\w*$/, '')
   s = s.replace(/\s{2,}/g, ' ').trim()
   if (s.length < 2) return null
   if (/^(your|a\/c|ac\b|acc|account|card|crd|cardholder|customer|x{2,}|\*|\d|lkr|rs\.?\b|usd|any\b|more\b|info|inquir|enquir|further|details|banking|us\b|inq|enq|call\b|get\b|for\b)/i.test(s)) return null
@@ -136,6 +140,7 @@ export function titleCase(s: string): string {
     .toLowerCase()
     .replace(/\b([a-z])/g, (c) => c.toUpperCase())
     .replace(/\b(Atm|Pos|Ceb|Leco|Slt|Kfc|Usd|Lkr|Hnb|Boc|Ntb|Dfcc|Ndb|Nsb|Ceft|Slips|Lanka Qr|Qr)\b/g, (w) => w.toUpperCase())
+    .replace(/\.(Com|Lk|Net|Org|Io)\b/g, (w) => w.toLowerCase())
 }
 
 function findMerchant(body: string, direction: Direction | null): string | null {
@@ -319,6 +324,7 @@ export function parseSms(body: string, sender: string | null, received: Date = n
   if (!dir && promo) return { kind: 'ignore', reason: 'Promotion' }
 
   const main = amounts[0]
+  const lkrEquivalent = main.currency !== 'LKR' ? amounts.find((m) => m.index > main.index && m.currency === 'LKR') ?? null : null
   const balance = money.find((m) => m.label === 'balance' && m.index > main.index) ?? money.find((m) => m.label === 'balance')
   const limit = money.find((m) => m.label === 'limit')
   const bank = detectBank(sender, text)
@@ -327,6 +333,7 @@ export function parseSms(body: string, sender: string | null, received: Date = n
     kind: 'txn',
     amount: main.value,
     currency: main.currency,
+    lkrAmount: lkrEquivalent ? lkrEquivalent.value : null,
     direction: dir ?? 'debit',
     directionGuessed: dir === null,
     merchant: findMerchant(text, dir),

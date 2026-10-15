@@ -78,7 +78,16 @@ describe('Generic formats (ComBank / HNB / BOC / People\'s style)', () => {
   })
   it('USD transaction keeps currency', () => {
     const r = txn('Transaction Approved on your Card 4111******1234 for USD 11.99 at SPOTIFY P2F3 STOCKHOLM Available Bal LKR 80,000.00', 'NTB')
-    expect(r).toMatchObject({ amount: 11.99, currency: 'USD', merchant: 'Spotify P2f3 Stockholm' })
+    expect(r).toMatchObject({ amount: 11.99, currency: 'USD', merchant: 'Spotify P2f3 Stockholm', lkrAmount: null })
+    expect(txn('Transaction Approved on your Card 4111******1234 for USD 11.99 at SPOTIFY P2F3 Available Bal LKR 80,000.00', 'NTB').merchant).toBe('Spotify')
+  })
+  it('USD with the rupee amount stated uses the bank figure', () => {
+    const r = txn('Purchase at NETFLIX.COM for USD 9.99 (LKR 3,312.45) on 22/05/26 from card ending #5370. Avl Bal LKR 80,000.00', 'COMBANK')
+    expect(r).toMatchObject({ amount: 9.99, currency: 'USD', lkrAmount: 3312.45, balance: 80000, last4: '5370', merchant: 'Netflix.com' })
+  })
+  it('EUR purchase', () => {
+    const r = txn('Transaction Approved on your Card 377412******1009 for EUR 25.00 at BOOKING.COM Available Bal LKR 200,000.00', 'NTB')
+    expect(r).toMatchObject({ amount: 25, currency: 'EUR', lkrAmount: null, balance: 200000 })
   })
 })
 

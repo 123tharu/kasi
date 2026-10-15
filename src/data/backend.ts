@@ -20,7 +20,7 @@ export interface Backend {
 // numeric columns come back from Postgres as strings — coerce them
 const NUMERIC: Partial<Record<TableName, string[]>> = {
   accounts: ['balance', 'credit_limit'],
-  transactions: ['amount'],
+  transactions: ['amount', 'orig_amount', 'fx_rate'],
   budgets: ['amount'],
   subscriptions: ['amount'],
   investments: ['units', 'cost', 'price', 'rate'],

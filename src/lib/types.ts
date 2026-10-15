@@ -10,6 +10,8 @@ export interface Settings {
   payday_day: number
   currency: string
   ingest_token: string
+  /** Extra % the bank adds on foreign-currency card payments */
+  fx_markup?: number | null
 }
 
 export interface Account {
@@ -48,6 +50,10 @@ export interface Transaction {
   raw_sms_id: string | null
   needs_review: boolean
   currency: string
+  /** Set when the payment was in another currency; `amount` is then the LKR value. */
+  orig_amount?: number | null
+  orig_currency?: string | null
+  fx_rate?: number | null
 }
 
 export interface Rule {

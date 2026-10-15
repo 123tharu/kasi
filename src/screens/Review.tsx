@@ -59,7 +59,7 @@ export function Review() {
             {txns.slice(0, 50).map((t) => (
               <Card key={t.id} className="p-2">
                 <TxRow tx={t} onClick={() => setEdit(t)} showDate />
-                {t.needs_review && t.category_id && <div className="px-3 pb-1 text-xs text-warn">{t.currency !== 'LKR' ? `Foreign currency (${t.currency}). Confirm the rupee amount.` : 'Money in or out? Kasi had to guess.'}</div>}
+                {t.needs_review && t.category_id && <div className="px-3 pb-1 text-xs text-warn">{t.currency !== 'LKR' ? `Paid in ${t.currency}. Waiting for the exchange rate; it converts automatically.` : 'Money in or out? Kasi had to guess.'}</div>}
                 <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-2 pb-2 pt-1">
                   {quick(t).map((c) => (
                     <button key={c.id} onClick={() => saveTransaction({ id: t.id, category_id: c.id }, { learn: true })} className="shrink-0 rounded-full border border-line px-3 py-1.5 text-[13px] text-muted hover:border-kiwi hover:text-ink">

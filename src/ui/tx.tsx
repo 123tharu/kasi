@@ -2,6 +2,7 @@ import { AlertCircle, MessageSquareText, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../data/store'
 import { patternFromMerchant } from '../lib/categorize'
+import { CURRENCIES } from '../lib/fx'
 import { parseAmount } from '../lib/money'
 import { fmtTime } from '../lib/period'
 import { needsReview } from '../lib/stats'
@@ -26,7 +27,10 @@ export function TxRow({ tx, onClick, showDate }: { tx: Transaction; onClick?: ()
       </div>
       <div className="shrink-0 text-right">
         <Money value={tx.direction === 'credit' ? tx.amount : tx.amount} sign={tx.direction === 'credit'} currency={tx.currency} className={cx('text-[15px] font-semibold', tx.direction === 'credit' && 'text-kiwi')} />
-        <div className="text-[12px] text-faint">{showDate ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : fmtTime(d)}</div>
+        <div className="text-[12px] text-faint">
+          {tx.orig_currency && tx.currency === 'LKR' ? <span className="mr-1 text-muted">{tx.orig_currency} {Number(tx.orig_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ·</span> : null}
+          {showDate ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : fmtTime(d)}
+        </div>
       </div>
     </button>
   )
@@ -72,6 +76,7 @@ export function TxEditor({ tx, open, onClose, preset }: { tx: Transaction | null
   const isNew = !tx
   const [direction, setDirection] = useState<Direction>('debit')
   const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState('LKR')
   const [merchant, setMerchant] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string>('')
@@ -85,6 +90,7 @@ export function TxEditor({ tx, open, onClose, preset }: { tx: Transaction | null
     const src = tx ?? preset ?? {}
     setDirection(src.direction ?? 'debit')
     setAmount(src.amount ? String(src.amount) : '')
+    setCurrency(tx ? 'LKR' : 'LKR')
     setMerchant(src.merchant ?? '')
     setCategoryId(src.category_id ?? null)
     setAccountId(src.account_id ?? db.accounts.find((a) => a.type === 'cash')?.id ?? db.accounts[0]?.id ?? '')
@@ -112,7 +118,8 @@ export function TxEditor({ tx, open, onClose, preset }: { tx: Transaction | null
           account_id: accountId || null,
           occurred_at: new Date(when).toISOString(),
           note: note.trim() || null,
-          ...(tx && tx.currency !== 'LKR' ? { currency: 'LKR' } : {}),
+          // New entries can be typed in another currency; Kasi converts them at that day's rate.
+          ...(isNew ? { currency } : tx && tx.currency !== 'LKR' ? { currency: 'LKR', orig_amount: tx.orig_amount ?? tx.amount, orig_currency: tx.orig_currency ?? tx.currency } : {}),
         },
         { learn: learn && !!merchant && !!categoryId && (isNew || categoryChanged) },
       )
@@ -163,7 +170,17 @@ export function TxEditor({ tx, open, onClose, preset }: { tx: Transaction | null
           ]}
         />
         <div className="flex items-baseline justify-center gap-2 py-2">
-          <span className="text-xl text-muted">Rs.</span>
+          {isNew ? (
+            <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="rounded-lg bg-transparent text-xl text-muted outline-none" aria-label="Currency">
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c} className="bg-card text-ink">
+                  {c === 'LKR' ? 'Rs.' : c}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xl text-muted">Rs.</span>
+          )}
           <input
             inputMode="decimal"
             autoFocus={isNew}
@@ -174,9 +191,16 @@ export function TxEditor({ tx, open, onClose, preset }: { tx: Transaction | null
             className="num max-w-[70vw] bg-transparent text-left text-5xl font-semibold outline-none placeholder:text-faint"
           />
         </div>
+        {isNew && currency !== 'LKR' && <div className="-mt-2 text-center text-xs text-muted">Kasi converts this to rupees at that day's exchange rate.</div>}
         {tx && tx.currency !== 'LKR' && (
           <div className="rounded-2xl bg-warn/10 px-4 py-3 text-sm text-warn">
-            Charged as {tx.currency} {tx.amount}. Enter the rupee amount from your statement; saving marks it as LKR.
+            Paid {tx.currency} {tx.amount}. Kasi couldn't get the exchange rate yet and will convert it automatically once online. You can also type the rupee amount and save.
+          </div>
+        )}
+        {tx && tx.currency === 'LKR' && tx.orig_currency && (
+          <div className="rounded-2xl bg-card2 px-4 py-3 text-sm text-muted">
+            Paid <b className="text-ink">{tx.orig_currency} {Number(tx.orig_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</b>
+            {tx.fx_rate ? <> · Rs. {Number(tx.fx_rate).toFixed(2)} per {tx.orig_currency}</> : null}. If your statement shows a different rupee amount, change it above.
           </div>
         )}
         <Field label="Merchant / description">

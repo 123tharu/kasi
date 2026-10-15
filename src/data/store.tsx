@@ -4,6 +4,7 @@ import { catMap, needsReview, type CatMap } from '../lib/stats'
 import type { Account, DB, Row, Settings, TableName, Transaction } from '../lib/types'
 import type { Backend } from './backend'
 import { planSms } from './engine'
+import { lkrPer } from '../lib/fx'
 
 interface StoreValue {
   db: DB
@@ -107,6 +108,20 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
     [backend],
   )
 
+  // ---------------- foreign currency → LKR ----------------
+  /** Converts a non-LKR transaction to rupees at that day's rate (+ the bank's fee from Settings). */
+  const toLkr = useCallback(async (tx: Partial<Transaction>): Promise<Partial<Transaction>> => {
+    const cur = (tx.orig_currency || tx.currency || 'LKR').toUpperCase()
+    if (cur === 'LKR' && (!tx.currency || tx.currency === 'LKR')) return tx
+    if (tx.currency === 'LKR') return tx // already converted (bank gave the rupee amount)
+    const orig = Number(tx.orig_amount ?? tx.amount ?? 0)
+    const rate = await lkrPer(cur, new Date(tx.occurred_at ?? Date.now()))
+    if (!rate) return { ...tx, orig_amount: orig, orig_currency: cur, needs_review: true }
+    const markup = Number(dbRef.current?.settings?.fx_markup ?? 0) / 100
+    const eff = rate * (1 + markup)
+    return { ...tx, amount: Math.round(orig * eff * 100) / 100, orig_amount: orig, orig_currency: cur, fx_rate: Math.round(eff * 1e6) / 1e6, currency: 'LKR', needs_review: Boolean(tx.needs_review) }
+  }, [])
+
   // ---------------- SMS inbox → transactions ----------------
   const processInbox = useCallback(async () => {
     if (processing.current) return
@@ -131,7 +146,7 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
               accountId = acc.id
             }
             try {
-              await insert('transactions', [{ ...plan.txn, account_id: accountId ?? null }])
+              await insert('transactions', [{ ...(await toLkr(plan.txn)), account_id: accountId ?? null }])
               added++
               if (plan.accountPatch) await update('accounts', plan.accountPatch.id, plan.accountPatch.patch)
               if (plan.subscriptionPatch) await update('subscriptions', plan.subscriptionPatch.id, plan.subscriptionPatch.patch)
@@ -150,7 +165,7 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
       processing.current = false
     }
     if (added) toast(added === 1 ? 'New transaction logged from SMS' : `${added} new transactions logged from SMS`)
-  }, [insert, update, toast])
+  }, [insert, update, toast, toLkr])
 
   // ---------------- load + live sync ----------------
   // One load at a time (StrictMode / focus events can fire twice; seeding defaults must never run twice).
@@ -176,6 +191,30 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
   useEffect(() => {
     reload()
   }, [reload])
+
+  // Any transaction still in a foreign currency (rate was unavailable, or saved before this feature) gets converted.
+  const converting = useRef(false)
+  const convertPending = useCallback(async () => {
+    if (converting.current || !dbRef.current) return
+    converting.current = true
+    try {
+      for (const t of dbRef.current.transactions.filter((x) => x.currency && x.currency !== 'LKR')) {
+        const c = await toLkr({ ...t, needs_review: false })
+        if (c.currency === 'LKR') {
+          await update('transactions', t.id, { amount: c.amount, orig_amount: c.orig_amount, orig_currency: c.orig_currency, fx_rate: c.fx_rate, currency: 'LKR', needs_review: false })
+        }
+      }
+    } catch (e) {
+      console.warn('FX conversion skipped', e)
+    } finally {
+      converting.current = false
+    }
+  }, [toLkr, update])
+
+  useEffect(() => {
+    if (db) convertPending()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db?.transactions.length])
 
   useEffect(() => {
     if (db) processInbox()
@@ -253,7 +292,7 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
         }
       } else {
         const rule = !tx.category_id ? matchRule(tx.merchant, d.rules) : null
-        ;[saved] = await insert('transactions', [{ source: 'manual', currency: 'LKR', ...tx, category_id: tx.category_id ?? rule?.category_id ?? null }])
+        ;[saved] = await insert('transactions', [await toLkr({ source: 'manual', currency: 'LKR', ...tx, category_id: tx.category_id ?? rule?.category_id ?? null })])
         await adjustCash(saved.account_id, saved.direction === 'credit' ? saved.amount : -saved.amount)
       }
       if (opts.learn && saved.merchant && saved.category_id) {
@@ -262,7 +301,7 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
       }
       return saved
     },
-    [insert, update, adjustCash, learnRule, toast],
+    [insert, update, adjustCash, learnRule, toast, toLkr],
   )
 
   const deleteTransaction = useCallback(

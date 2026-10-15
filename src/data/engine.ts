@@ -90,17 +90,21 @@ export function planSms(sms: RawSms, db: DB): SmsPlan {
   const fallback = rule ? null : fallbackCategory(r.direction, sms.body, db.categories)
   const merchant = rule?.rename_to || r.merchant || (r.direction === 'credit' ? 'Money in' : 'Card payment')
 
+  // Foreign currency: if the bank already told us the rupee amount, use it. Otherwise the store
+  // converts at that day's exchange rate before saving.
+  const lkr = r.currency !== 'LKR' && r.lkrAmount !== null
   plan.txn = {
-    amount: r.amount,
+    amount: lkr ? r.lkrAmount! : r.amount,
+    ...(r.currency !== 'LKR' ? { orig_amount: r.amount, orig_currency: r.currency, fx_rate: lkr ? Math.round((r.lkrAmount! / r.amount) * 1e6) / 1e6 : null } : {}),
     direction: r.direction,
     occurred_at: r.occurredAt.toISOString(),
     merchant,
     category_id: rule?.category_id ?? fallback?.id ?? null,
     source: 'sms',
     raw_sms_id: sms.id,
-    needs_review: r.directionGuessed || r.currency !== 'LKR',
-    currency: r.currency,
-    note: r.currency !== 'LKR' ? `Charged in ${r.currency}. Edit to the rupee amount once your bank posts it.` : null,
+    needs_review: r.directionGuessed,
+    currency: lkr ? 'LKR' : r.currency,
+    note: null,
   }
 
   // A matching subscription renewal → move its next date forward

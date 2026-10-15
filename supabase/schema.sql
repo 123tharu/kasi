@@ -58,6 +58,7 @@ create table if not exists raw_sms (
 );
 alter table accounts add column if not exists credit_limit numeric(14,2);
 alter table raw_sms alter column user_id set default auth.uid();
+alter table settings add column if not exists fx_markup numeric(5,2) not null default 0;
 
 create index if not exists raw_sms_user_status on raw_sms(user_id, status);
 
@@ -79,6 +80,10 @@ create table if not exists transactions (
   created_at    timestamptz not null default now()
 );
 create index if not exists tx_user_time on transactions(user_id, occurred_at desc);
+-- Foreign-currency payments: amount is always LKR; the original is kept alongside.
+alter table transactions add column if not exists orig_amount numeric(14,2);
+alter table transactions add column if not exists orig_currency text;
+alter table transactions add column if not exists fx_rate numeric(14,6);
 
 -- ---------- auto-categorisation rules ----------
 create table if not exists rules (

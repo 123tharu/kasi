@@ -2,6 +2,7 @@ import { Check, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../data/store'
 import { patternFromMerchant } from '../lib/categorize'
+import { lkrPer } from '../lib/fx'
 import { fmt, parseAmount } from '../lib/money'
 import { addDays, advanceDate, daysUntil, isoDate, parseIsoDate } from '../lib/period'
 import type { Subscription, Transaction } from '../lib/types'
@@ -38,7 +39,16 @@ export function Subscriptions() {
   const [adding, setAdding] = useState(false)
   const active = db.subscriptions.filter((s) => s.active).sort((a, b) => a.next_date.localeCompare(b.next_date))
   const inactive = db.subscriptions.filter((s) => !s.active)
-  const perMonth = active.reduce((a, s) => a + monthly(s), 0)
+  // Subscriptions billed in USD etc. count in rupees at today's rate.
+  const [rates, setRates] = useState<Record<string, number>>({ LKR: 1 })
+  useEffect(() => {
+    const curs = [...new Set(db.subscriptions.map((x) => x.currency))].filter((c) => c && c !== 'LKR' && !rates[c])
+    curs.forEach((c) => lkrPer(c).then((r) => r && setRates((p) => ({ ...p, [c]: r }))))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db.subscriptions])
+  const inLkr = (x: Subscription) => (rates[x.currency] ? monthly(x) * rates[x.currency] : 0)
+  const perMonth = active.reduce((a, x) => a + inLkr(x), 0)
+  const unconverted = active.some((x) => !rates[x.currency])
   const found = useMemo(() => detect(db.transactions, db.subscriptions), [db.transactions, db.subscriptions])
 
   return (
@@ -59,7 +69,10 @@ export function Subscriptions() {
             <div className="text-sm text-muted">Per month</div>
             <Money value={perMonth} className="text-3xl font-bold" cents={false} />
           </div>
-          <div className="text-right text-sm text-muted num">{fmt(perMonth * 12, { cents: false })} a year</div>
+          <div className="text-right text-sm text-muted num">
+            {fmt(perMonth * 12, { cents: false })} a year
+            {unconverted && <div className="text-xs text-faint">Loading exchange rates…</div>}
+          </div>
         </Card>
       )}
       {!active.length && <Empty icon="🔁" title="No subscriptions yet">Add Netflix, Spotify, your phone bill… Kasi reminds you before they renew and marks them paid when the SMS arrives.</Empty>}
@@ -78,6 +91,7 @@ export function Subscriptions() {
               </div>
               <div className="text-right">
                 <Money value={s.amount} className="text-[17px] font-semibold" currency={s.currency} />
+                {s.currency !== 'LKR' && rates[s.currency] ? <div className="text-xs text-faint num">≈ {fmt(s.amount * rates[s.currency], { cents: false })}</div> : null}
                 <div className="text-sm text-muted capitalize">{s.cycle}</div>
               </div>
               {d <= 3 && (

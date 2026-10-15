@@ -236,6 +236,7 @@ export function Settings() {
   const s = db.settings!
   const [name, setName] = useState(s.display_name ?? '')
   const [payday, setPayday] = useState(String(s.payday_day))
+  const [markup, setMarkup] = useState(String(Number(s.fx_markup ?? 0)))
   const [showQr, setShowQr] = useState(false)
   const cfg = loadConfig()
 
@@ -279,6 +280,19 @@ export function Settings() {
               </option>
             ))}
           </Select>
+        </Field>
+        <Field label="Foreign card fee (%)" hint="Payments in USD and other currencies are converted at that day's exchange rate, plus this fee. Sri Lankan banks usually add 2–3.5%; your card statement shows the exact figure.">
+          <Input
+            inputMode="decimal"
+            value={markup}
+            onChange={(e) => setMarkup(e.target.value)}
+            onBlur={() => {
+              const v = Math.max(0, Math.min(15, parseFloat(markup) || 0))
+              setMarkup(String(v))
+              if (v !== Number(s.fx_markup ?? 0)) updateSettings({ fx_markup: v }).then(() => toast('Applies to new foreign payments'))
+            }}
+            placeholder="0"
+          />
         </Field>
       </Card>
 
