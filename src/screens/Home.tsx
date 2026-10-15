@@ -7,6 +7,7 @@ import { fmtShort } from '../lib/money'
 import { cycleFor, daysLeft, daysUntil, inPeriod, startOfDay } from '../lib/period'
 import { byCategory, isSpend, totals } from '../lib/stats'
 import { portfolio } from '../lib/invest'
+import { PendingForeignCard } from '../ui/foreign'
 import { TxEditor, TxRow } from '../ui/tx'
 import { Bar, Card, cx, Money, SectionTitle } from '../ui/ui'
 import type { Account, Transaction } from '../lib/types'
@@ -94,6 +95,9 @@ export function Home() {
         </button>
       </div>
 
+      <div className="mb-4">
+        <PendingForeignCard />
+      </div>
       <div className="grid gap-4 md:grid-cols-2">
         {/* Today */}
         <Card className="p-5" onClick={() => nav('/timeline')}>

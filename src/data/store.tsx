@@ -4,7 +4,7 @@ import { catMap, needsReview, type CatMap } from '../lib/stats'
 import type { Account, DB, Row, Settings, TableName, Transaction } from '../lib/types'
 import type { Backend } from './backend'
 import { planSms } from './engine'
-import { lkrPer } from '../lib/fx'
+import { checkRates } from '../lib/fx'
 
 interface StoreValue {
   db: DB
@@ -17,6 +17,7 @@ interface StoreValue {
   updateSettings(p: Partial<Settings>): Promise<void>
   saveTransaction(tx: Partial<Transaction>, opts?: { learn?: boolean }): Promise<Transaction>
   deleteTransaction(tx: Transaction): Promise<void>
+  confirmForeign(tx: Transaction, lkrAmount: number): Promise<void>
   learnRule(merchant: string, categoryId: string): Promise<number>
   addSms(body: string, sender?: string | null): Promise<void>
   importSms(list: { sender: string | null; body: string; received_at: string }[], onProgress?: (done: number) => void): Promise<{ added: number; alreadyHad: number }>
@@ -111,15 +112,14 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
   // ---------------- foreign currency → LKR ----------------
   /** Converts a non-LKR transaction to rupees at that day's rate (+ the bank's fee from Settings). */
   const toLkr = useCallback(async (tx: Partial<Transaction>): Promise<Partial<Transaction>> => {
-    const cur = (tx.orig_currency || tx.currency || 'LKR').toUpperCase()
-    if (cur === 'LKR' && (!tx.currency || tx.currency === 'LKR')) return tx
-    if (tx.currency === 'LKR') return tx // already converted (bank gave the rupee amount)
+    if (!tx.currency || tx.currency === 'LKR') return tx // LKR already (or the bank gave the rupee amount)
+    const cur = tx.currency.toUpperCase()
     const orig = Number(tx.orig_amount ?? tx.amount ?? 0)
-    const rate = await lkrPer(cur, new Date(tx.occurred_at ?? Date.now()))
-    if (!rate) return { ...tx, orig_amount: orig, orig_currency: cur, needs_review: true }
+    const check = await checkRates(cur, new Date(tx.occurred_at ?? Date.now()))
+    if (!check.rate) return { ...tx, orig_amount: orig, orig_currency: cur }
     const markup = Number(dbRef.current?.settings?.fx_markup ?? 0) / 100
-    const eff = rate * (1 + markup)
-    return { ...tx, amount: Math.round(orig * eff * 100) / 100, orig_amount: orig, orig_currency: cur, fx_rate: Math.round(eff * 1e6) / 1e6, currency: 'LKR', needs_review: Boolean(tx.needs_review) }
+    const eff = check.rate * (1 + markup)
+    return { ...tx, amount: Math.round(orig * eff * 100) / 100, orig_amount: orig, orig_currency: cur, fx_rate: Math.round(eff * 1e6) / 1e6, currency: 'LKR' }
   }, [])
 
   // ---------------- SMS inbox → transactions ----------------
@@ -199,9 +199,9 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
     converting.current = true
     try {
       for (const t of dbRef.current.transactions.filter((x) => x.currency && x.currency !== 'LKR')) {
-        const c = await toLkr({ ...t, needs_review: false })
+        const c = await toLkr(t)
         if (c.currency === 'LKR') {
-          await update('transactions', t.id, { amount: c.amount, orig_amount: c.orig_amount, orig_currency: c.orig_currency, fx_rate: c.fx_rate, currency: 'LKR', needs_review: false })
+          await update('transactions', t.id, { amount: c.amount, orig_amount: c.orig_amount, orig_currency: c.orig_currency, fx_rate: c.fx_rate, currency: 'LKR', pending: true })
         }
       }
     } catch (e) {
@@ -292,7 +292,7 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
         }
       } else {
         const rule = !tx.category_id ? matchRule(tx.merchant, d.rules) : null
-        ;[saved] = await insert('transactions', [await toLkr({ source: 'manual', currency: 'LKR', ...tx, category_id: tx.category_id ?? rule?.category_id ?? null })])
+        ;[saved] = await insert('transactions', [{ ...(await toLkr({ source: 'manual', currency: 'LKR', ...tx, category_id: tx.category_id ?? rule?.category_id ?? null })), pending: false }])
         await adjustCash(saved.account_id, saved.direction === 'credit' ? saved.amount : -saved.amount)
       }
       if (opts.learn && saved.merchant && saved.category_id) {
@@ -302,6 +302,22 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
       return saved
     },
     [insert, update, adjustCash, learnRule, toast, toLkr],
+  )
+
+  /** Owner confirms a foreign payment's rupee amount; from now on it counts in totals and budgets. */
+  const confirmForeign = useCallback(
+    async (tx: Transaction, lkrAmount: number) => {
+      const orig = Number(tx.orig_amount ?? 0)
+      await update('transactions', tx.id, {
+        amount: Math.round(lkrAmount * 100) / 100,
+        currency: 'LKR',
+        fx_rate: orig ? Math.round((lkrAmount / orig) * 1e6) / 1e6 : tx.fx_rate ?? null,
+        pending: false,
+        needs_review: false,
+      })
+      toast(`Added ${tx.orig_currency ?? ''} ${orig.toFixed(2)} as Rs. ${lkrAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`)
+    },
+    [update, toast],
   )
 
   const deleteTransaction = useCallback(
@@ -373,6 +389,7 @@ export function StoreProvider({ backend, children, fallback }: { backend: Backen
     updateSettings,
     saveTransaction,
     deleteTransaction,
+    confirmForeign,
     learnRule,
     addSms,
     importSms,

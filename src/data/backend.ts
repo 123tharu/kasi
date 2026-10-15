@@ -203,7 +203,7 @@ export class DemoBackend implements Backend {
 function defaults(table: TableName): Record<string, unknown> {
   switch (table) {
     case 'transactions':
-      return { account_id: null, category_id: null, merchant: null, note: null, source: 'manual', raw_sms_id: null, needs_review: false, currency: 'LKR', occurred_at: new Date().toISOString() }
+      return { account_id: null, category_id: null, merchant: null, note: null, source: 'manual', raw_sms_id: null, needs_review: false, pending: false, currency: 'LKR', occurred_at: new Date().toISOString() }
     case 'accounts':
       return { bank: null, last4: null, type: 'bank', balance: null, balance_at: null, credit_limit: null, color: null, archived: false }
     case 'categories':

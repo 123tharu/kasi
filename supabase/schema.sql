@@ -84,6 +84,8 @@ create index if not exists tx_user_time on transactions(user_id, occurred_at des
 alter table transactions add column if not exists orig_amount numeric(14,2);
 alter table transactions add column if not exists orig_currency text;
 alter table transactions add column if not exists fx_rate numeric(14,6);
+-- Foreign payments wait for the owner's confirmation before they count.
+alter table transactions add column if not exists pending boolean not null default false;
 
 -- ---------- auto-categorisation rules ----------
 create table if not exists rules (

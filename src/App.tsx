@@ -18,6 +18,7 @@ import { Review } from './screens/Review'
 import { Subscriptions } from './screens/Subscriptions'
 import { Timeline } from './screens/Timeline'
 import { ErrorBoundary, repairApp } from './ui/ErrorBoundary'
+import { ForeignWatcher } from './ui/foreign'
 import { Button, cx, Field, Input } from './ui/ui'
 
 const NAV = [
@@ -107,6 +108,7 @@ function Shell() {
         </div>
       </nav>
 
+      <ForeignWatcher />
       {toastMsg && (
         <div className="anim-sheet fixed inset-x-0 bottom-28 z-[60] flex justify-center px-4 md:bottom-8">
           <div className="rounded-full bg-ink px-5 py-3 text-sm font-medium text-bg shadow-2xl">{toastMsg}</div>

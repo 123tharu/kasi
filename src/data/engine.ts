@@ -103,6 +103,8 @@ export function planSms(sms: RawSms, db: DB): SmsPlan {
     source: 'sms',
     raw_sms_id: sms.id,
     needs_review: r.directionGuessed,
+    // Every foreign payment waits for the owner to confirm the rupee amount.
+    pending: r.currency !== 'LKR',
     currency: lkr ? 'LKR' : r.currency,
     note: null,
   }

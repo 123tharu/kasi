@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useStore } from '../data/store'
 import { needsReview } from '../lib/stats'
 import type { RawSms, Transaction } from '../lib/types'
+import { PendingForeignCard } from '../ui/foreign'
 import { TxEditor, TxRow } from '../ui/tx'
 import { BackLink } from './More'
 import { Button, Card, Empty, PageTitle, SectionTitle } from '../ui/ui'
@@ -11,7 +12,7 @@ export function Review() {
   const [edit, setEdit] = useState<Transaction | null>(null)
   const [fromSms, setFromSms] = useState<RawSms | null>(null)
   const [showIgnored, setShowIgnored] = useState(false)
-  const txns = useMemo(() => db.transactions.filter((t) => needsReview(t, cats)), [db.transactions, cats])
+  const txns = useMemo(() => db.transactions.filter((t) => needsReview(t, cats) && !t.pending), [db.transactions, cats])
   const failed = db.raw_sms.filter((s) => s.status === 'failed')
   const ignored = db.raw_sms.filter((s) => s.status === 'ignored').slice(0, 30)
 
@@ -25,7 +26,10 @@ export function Review() {
     <div>
       <BackLink />
       <PageTitle title="Review" sub="Anything Kasi wasn't sure about" />
-      {!txns.length && !failed.length && <Empty icon="✨" title="All caught up">Every transaction has a category and every SMS was understood.</Empty>}
+      <div className="mb-4">
+        <PendingForeignCard />
+      </div>
+      {!txns.length && !failed.length && !db.transactions.some((t) => t.pending) && <Empty icon="✨" title="All caught up">Every transaction has a category and every SMS was understood.</Empty>}
 
       {failed.length > 0 && (
         <>

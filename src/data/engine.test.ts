@@ -18,7 +18,7 @@ const sms = (body: string, sender = 'COMBANK') => ({ id: 's1', sender, body, rec
 describe('foreign currency in planSms', () => {
   it('uses the rupee amount from the SMS and keeps the original', () => {
     const p = planSms(sms('Purchase at NETFLIX.COM for USD 9.99 (LKR 3,312.45) on 22/05/26 from card ending #5370.'), db())
-    expect(p.txn).toMatchObject({ amount: 3312.45, currency: 'LKR', orig_amount: 9.99, orig_currency: 'USD', category_id: 'subs', needs_review: false })
+    expect(p.txn).toMatchObject({ amount: 3312.45, currency: 'LKR', orig_amount: 9.99, orig_currency: 'USD', category_id: 'subs', needs_review: false, pending: true })
     expect(p.txn!.fx_rate).toBeCloseTo(331.58, 1)
   })
   it('leaves USD for the store to convert when no rupee amount is given', () => {

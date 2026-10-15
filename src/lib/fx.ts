@@ -77,3 +77,56 @@ export async function lkrPer(currency: string, when: Date = new Date()): Promise
 }
 
 export const CURRENCIES = ['LKR', 'USD', 'EUR', 'GBP', 'AUD', 'SGD', 'INR', 'AED', 'JPY', 'CAD']
+
+// ---------------------------------------------------------------- double check
+
+export interface RateQuote {
+  source: string
+  rate: number
+}
+export interface RateCheck {
+  quotes: RateQuote[]
+  /** average of the sources that answered */
+  rate: number | null
+  /** largest difference between sources, in % */
+  spreadPct: number | null
+  /** true when two independent sources agree within 1% */
+  agreed: boolean
+}
+
+/** Second, independent provider (FXRatesAPI) with dated history. */
+async function fxratesApi(cur: string, when: Date): Promise<number | null> {
+  const today = startOfDay(new Date())
+  const key = `fxr:${cur}@${isoDate(startOfDay(when) >= today ? today : when)}`
+  const c = load()
+  if (c[key]) return c[key]
+  const url =
+    startOfDay(when) >= today
+      ? `https://api.fxratesapi.com/latest?base=${cur.toUpperCase()}&currencies=LKR`
+      : `https://api.fxratesapi.com/historical?date=${isoDate(when)}&base=${cur.toUpperCase()}&currencies=LKR`
+  try {
+    const j = (await getJson(url)) as { rates?: Record<string, number> }
+    const rate = j?.rates?.LKR
+    if (rate && isFinite(rate)) {
+      c[key] = rate
+      save()
+      return rate
+    }
+  } catch {
+    /* unavailable */
+  }
+  return null
+}
+
+/** Gets the rate for that day from two independent providers and says whether they agree. */
+export async function checkRates(currency: string, when: Date): Promise<RateCheck> {
+  const cur = currency.toLowerCase()
+  const [a, b] = await Promise.all([lkrPer(cur, when), fxratesApi(cur, when)])
+  const quotes: RateQuote[] = []
+  if (a) quotes.push({ source: 'currency-api', rate: a })
+  if (b) quotes.push({ source: 'FXRatesAPI', rate: b })
+  if (!quotes.length) return { quotes, rate: null, spreadPct: null, agreed: false }
+  const rate = quotes.reduce((s, q) => s + q.rate, 0) / quotes.length
+  const spreadPct = quotes.length > 1 ? (Math.abs(quotes[0].rate - quotes[1].rate) / rate) * 100 : null
+  return { quotes, rate, spreadPct, agreed: spreadPct !== null && spreadPct <= 1 }
+}

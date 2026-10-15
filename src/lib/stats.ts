@@ -11,10 +11,14 @@ export function isTransfer(t: Transaction, cats: CatMap): boolean {
   return !!t.category_id && cats.get(t.category_id)?.kind === 'transfer'
 }
 export function isSpend(t: Transaction, cats: CatMap): boolean {
-  return t.direction === 'debit' && t.currency === 'LKR' && !isTransfer(t, cats)
+  return t.direction === 'debit' && t.currency === 'LKR' && !t.pending && !isTransfer(t, cats)
 }
 export function isIncome(t: Transaction, cats: CatMap): boolean {
-  return t.direction === 'credit' && t.currency === 'LKR' && !isTransfer(t, cats)
+  return t.direction === 'credit' && t.currency === 'LKR' && !t.pending && !isTransfer(t, cats)
+}
+
+export function isPendingForeign(t: Transaction): boolean {
+  return !!t.pending
 }
 
 export function totals(txns: Transaction[], cats: CatMap, p: Period) {
@@ -82,7 +86,7 @@ export function topMerchants(txns: Transaction[], cats: CatMap, p: Period, n = 5
 }
 
 export function needsReview(t: Transaction, cats: CatMap): boolean {
-  if (t.needs_review) return true
+  if (t.pending || t.needs_review) return true
   if (!t.category_id) return true
   return !cats.has(t.category_id)
 }

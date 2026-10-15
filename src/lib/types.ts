@@ -54,6 +54,8 @@ export interface Transaction {
   orig_amount?: number | null
   orig_currency?: string | null
   fx_rate?: number | null
+  /** Foreign payment waiting for the owner to confirm the rupee amount; not counted until confirmed. */
+  pending?: boolean
 }
 
 export interface Rule {

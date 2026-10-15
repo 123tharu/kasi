@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../data/store'
 import { patternFromMerchant } from '../lib/categorize'
 import { CURRENCIES } from '../lib/fx'
+import { openForeignConfirm } from './foreign'
 import { parseAmount } from '../lib/money'
 import { fmtTime } from '../lib/period'
 import { needsReview } from '../lib/stats'
@@ -16,17 +17,20 @@ export function TxRow({ tx, onClick, showDate }: { tx: Transaction; onClick?: ()
   const review = needsReview(tx, cats)
   const d = new Date(tx.occurred_at)
   return (
-    <button onClick={onClick} className="flex w-full items-center gap-3 rounded-2xl px-2 py-2.5 text-left transition hover:bg-card2/60 active:bg-card2">
+    <button onClick={tx.pending ? () => openForeignConfirm(tx.id) : onClick} className="flex w-full items-center gap-3 rounded-2xl px-2 py-2.5 text-left transition hover:bg-card2/60 active:bg-card2">
       <CatIcon cat={cat} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-semibold">{tx.merchant || (tx.direction === 'credit' ? 'Money in' : 'Payment')}</div>
         <div className="flex items-center gap-1.5 truncate text-[13px] text-muted">
           {review && <AlertCircle size={13} className="shrink-0 text-warn" />}
-          <span className="truncate">{cat?.name ?? 'Uncategorised'}{acc ? ` · ${acc.name}` : ''}</span>
+          {tx.pending ? <span className="truncate font-medium text-warn">Tap to confirm the rupee amount</span> : <span className="truncate">{cat?.name ?? 'Uncategorised'}{acc ? ` · ${acc.name}` : ''}</span>}
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <Money value={tx.direction === 'credit' ? tx.amount : tx.amount} sign={tx.direction === 'credit'} currency={tx.currency} className={cx('text-[15px] font-semibold', tx.direction === 'credit' && 'text-kiwi')} />
+        <span className={cx('inline-flex items-baseline gap-0.5', tx.pending && 'opacity-60')}>
+          {tx.pending && tx.currency === 'LKR' ? <span className="text-sm text-muted">≈</span> : null}
+          <Money value={tx.amount} sign={tx.direction === 'credit'} currency={tx.currency} className={cx('text-[15px] font-semibold', tx.direction === 'credit' && 'text-kiwi')} />
+        </span>
         <div className="text-[12px] text-faint">
           {tx.orig_currency && tx.currency === 'LKR' ? <span className="mr-1 text-muted">{tx.orig_currency} {Number(tx.orig_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ·</span> : null}
           {showDate ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : fmtTime(d)}
