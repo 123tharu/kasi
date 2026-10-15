@@ -101,7 +101,11 @@ export function SmsSetup() {
   const [sender, setSender] = useState('')
   const [sending, setSending] = useState(false)
   const token = db.settings!.ingest_token
-  const url = backend.ingestUrl ? backend.ingestUrl.replace(/ingest_sms$/, 'ingest_sms_raw') : 'https://<your-project>.supabase.co/rest/v1/rpc/ingest_sms_raw'
+  // Everything MacroDroid needs lives in the URL and the body, so no headers have to be typed on the phone.
+  const url = backend.ingestUrl
+    ? `${backend.ingestUrl.replace(/ingest_sms$/, 'ingest_sms_raw')}?apikey=${backend.anonKey}`
+    : 'https://<your-project>.supabase.co/rest/v1/rpc/ingest_sms_raw?apikey=<key>'
+  const bodyTemplate = `${token}|[sms_number]|[sms_message]`
   const preview = text.trim() ? parseSms(text, sender || null, new Date()) : null
   const lastSms = db.raw_sms[0]
 
@@ -113,8 +117,8 @@ export function SmsSetup() {
         // Same request MacroDroid will make, so this proves the whole pipe works.
         const r = await fetch(url, {
           method: 'POST',
-          headers: { apikey: backend.anonKey!, 'Content-Type': 'text/plain', 'x-kasi-token': token, 'x-sms-sender': sender || 'TEST' },
-          body: text,
+          headers: { 'Content-Type': 'text/plain' },
+          body: `${token}|${sender || 'TEST'}|${text}`,
         })
         const body = await r.text()
         if (!r.ok) throw new Error(body)
@@ -160,16 +164,14 @@ export function SmsSetup() {
           <p>
             <b>Actions</b> → Web Interactions (or Connectivity) → <b>HTTP Request</b>. Method <b>POST</b>, then fill in:
           </p>
-          <CopyField label="URL" value={url} />
+          <CopyField label="1 · URL (paste into Request URL)" value={url} />
           <p>
-            Content body: type <b>text/plain</b>, body text: <code className="rounded bg-card2 px-1.5 py-0.5 text-ink">[sms_message]</code> (insert it from the magic-text <b>…</b> button)
+            Open <b>Content body</b>, set the content type to <b>text/plain</b>, and paste this as the body. Paste it exactly: MacroDroid swaps the parts in [brackets] for the real sender and message.
           </p>
-          <p>Headers (add each one):</p>
-          <CopyField label="apikey" value={backend.anonKey ?? '<your anon key>'} />
-          <CopyField label="x-kasi-token (keep private)" value={token} secret />
-          <div className="rounded-xl bg-card2 p-3 text-xs">
-            Also add header <b className="text-ink">x-sms-sender</b> with value <code className="text-ink">[sms_number]</code>, so Kasi knows which bank sent it.
-          </div>
+          <CopyField label="2 · Body (contains your private token)" value={bodyTemplate} secret />
+          <p>
+            Nothing else is needed. Leave <b>Headers</b> and <b>Query parameters</b> empty.
+          </p>
         </Step>
         <Step n={4} title="Keep it running">
           <p>

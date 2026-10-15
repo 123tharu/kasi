@@ -196,14 +196,25 @@ begin
   return 'ok';
 end $$;
 
--- Raw-body variant: POST text/plain, token + sender in headers
---   x-kasi-token: <token>     x-sms-sender: <sender>
+-- Raw-body variant used by MacroDroid. POST text/plain to
+--   .../rest/v1/rpc/ingest_sms_raw?apikey=<publishable key>
+-- Body:  <token>|[sms_number]|[sms_message]      (no headers needed)
+-- Headers x-kasi-token / x-sms-sender also work, with the plain SMS as body.
 create or replace function ingest_sms_raw(text)
 returns text
 language plpgsql security definer set search_path = public as $$
-declare h json := coalesce(current_setting('request.headers', true), '{}')::json;
+declare
+  h json := coalesce(current_setting('request.headers', true), '{}')::json;
+  m text[];
 begin
-  return ingest_sms(h->>'x-kasi-token', h->>'x-sms-sender', $1);
+  if h->>'x-kasi-token' is not null then
+    return ingest_sms(h->>'x-kasi-token', h->>'x-sms-sender', $1);
+  end if;
+  m := regexp_match($1, '^\s*([0-9a-f]{16,})\s*\|([^|]*)\|(.*)$');
+  if m is null then
+    raise exception 'missing token' using errcode = '28000';
+  end if;
+  return ingest_sms(m[1], nullif(trim(m[2]), ''), m[3]);
 end $$;
 
 revoke all on function ingest_sms(text,text,text) from public;
