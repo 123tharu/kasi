@@ -122,7 +122,7 @@ export function fallbackCategory(direction: 'debit' | 'credit', body: string, ca
     if (/interest|dividend/i.test(body)) return byName('Interest & Dividends')
     return null
   }
-  if (/\batm\b|cash withdraw/i.test(body)) return byName('Cash Withdrawal')
+  if (/\batm\b|cash withdraw|^\s*withdrawal (at|of)\b/i.test(body)) return byName('Cash Withdrawal')
   return null
 }
 

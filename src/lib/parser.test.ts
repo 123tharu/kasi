@@ -78,7 +78,7 @@ describe('Generic formats (ComBank / HNB / BOC / People\'s style)', () => {
   })
   it('USD transaction keeps currency', () => {
     const r = txn('Transaction Approved on your Card 4111******1234 for USD 11.99 at SPOTIFY P2F3 STOCKHOLM Available Bal LKR 80,000.00', 'NTB')
-    expect(r).toMatchObject({ amount: 11.99, currency: 'USD', merchant: 'Spotify P2f3 Stockholm', lkrAmount: null })
+    expect(r).toMatchObject({ amount: 11.99, currency: 'USD', merchant: 'Spotify', lkrAmount: null })
     expect(txn('Transaction Approved on your Card 4111******1234 for USD 11.99 at SPOTIFY P2F3 Available Bal LKR 80,000.00', 'NTB').merchant).toBe('Spotify')
   })
   it('USD with the rupee amount stated uses the bank figure', () => {
@@ -106,6 +106,28 @@ describe('Real samples from your phone', () => {
     const r = txn('LKR 1.00 debited from AC **0000 for TEST SHOP\n15/10/2026 12:18:00\nTo Inq Call 0112303050', 'SAMPATHTXN', rx)
     expect(r.occurredAt.getHours()).toBe(12)
     expect(r.occurredAt.getMinutes()).toBe(18)
+  })
+})
+
+describe('Real messages from 1–20 Oct', () => {
+  const rx = new Date(2026, 9, 18, 12, 0)
+  it('ComBank Q+ cashback promotion is ignored', () => {
+    expect(parseSms('Pay Bills. Collect Cashback!  Get 10% cashback up to Rs1,500/- when you pay your bills with ComBank Q+. T&C apply.', 'ComBank Q+', rx).kind).toBe('ignore')
+  })
+  it('Pizza Hut and SLT-Mobitel messages are not bank alerts', () => {
+    expect(parseSms('Weekend Vibes at Pizza Hut! Get 2 Lava Cakes & 1 Portion of Garlic Bread for Rs.1,990 with any pizza. Pay by card.', 'Pizza Hut', rx).kind).toBe('ignore')
+    expect(parseSms('You have recharged Rs. 1000.00  Your account balance is Rs. 754.55 ,expires on 15/11/2026', 'SLT-Mobitel', rx).kind).toBe('ignore')
+  })
+  it('phone numbers and country codes are stripped from merchants', () => {
+    expect(txn('Dear Cardholder, Purchase at Google One 650-2530000 US for LKR 6,425.00 on 15/10/26 05:36 PM has been authorised on your debit card ending #5370.', 'COMBANK', rx).merchant).toBe('Google One')
+    expect(txn('Dear Cardholder, Purchase at MOBITEL (PVT) LTD 0712755777 LK for LKR 1,000.00 on 11/10/26 10:14 PM has been authorised on your debit card ending #5370.', 'COMBANK', rx).merchant).toBe('Mobitel (Pvt) Ltd')
+    expect(txn('Dear Cardholder, Purchase at PICKME RIDE 0117433433 LK for LKR 632.41 on 09/10/26 11:09 PM has been authorised on your debit card ending #5370.', 'COMBANK', rx).merchant).toBe('Pickme Ride')
+    expect(txn('Dear Cardholder, Purchase at Spotify P47EA6D4BC STOCKHOLM SE for LKR 950.00 on 12/10/26 10:21 AM has been authorised on your debit card ending #5370.', 'COMBANK', rx).merchant).toBe('Spotify')
+    expect(txn('Dear Cardholder, Purchase at ANTHROPIC* CLAUDE SUB +14152360599 US for USD 20.00 on 02/10/26 04:17 PM has been authorised on your debit card ending #5370.', 'COMBANK', rx).merchant).toMatch(/^Anthropic\* Claude Sub$/)
+  })
+  it('ATM withdrawal', () => {
+    const r = txn('Withdrawal at Hatton National Bank HNB PANNIPITI LK for LKR 20,000.00 on 04/10/26 06:52 PM from your debit card ending #5370.', 'COMBANK', rx)
+    expect(r).toMatchObject({ amount: 20000, direction: 'debit', last4: '5370' })
   })
 })
 

@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronRight, Plus } from 'lucide-react'
+import { AlertCircle, ChevronRight, Plus, SmartphoneNfc } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useStore } from '../data/store'
@@ -79,6 +79,9 @@ export function Home() {
   const recent = db.transactions.slice(0, 6)
   const dayName = new Date().toLocaleDateString('en-GB', { weekday: 'long' })
   const busy = todayTx.length >= 5
+  // raw_sms is loaded newest first; warn when the phone has gone quiet for 2+ days
+  const lastSms = db.raw_sms.reduce<string | null>((m, x) => (!m || x.received_at > m ? x.received_at : m), null)
+  const silentDays = lastSms ? Math.floor((Date.now() - new Date(lastSms).getTime()) / 86400000) : 0
 
   return (
     <div>
@@ -95,6 +98,18 @@ export function Home() {
         </button>
       </div>
 
+      {backend.kind === 'supabase' && silentDays >= 2 && (
+        <Link to="/more/sms" className="mb-4 block">
+          <Card className="flex items-center gap-3 border-warn/40 p-4" onClick={() => {}}>
+            <SmartphoneNfc className="shrink-0 text-warn" size={22} />
+            <div className="flex-1">
+              <div className="text-[15px] font-semibold">No bank SMS for {silentDays} days</div>
+              <div className="text-xs text-muted">Last one arrived {relTime(new Date(lastSms!))}. If you've used your cards since, check MacroDroid on your phone.</div>
+            </div>
+            <ChevronRight size={18} className="text-faint" />
+          </Card>
+        </Link>
+      )}
       <div className="mb-4">
         <PendingForeignCard />
       </div>

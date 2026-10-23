@@ -122,10 +122,15 @@ function cleanMerchant(raw: string): string | null {
   s = s.replace(/[\s.,:;\-*]+$/, '')
   s = s.replace(/\s*@\s*\d+$/, '').replace(/\s+-\s*\d{4,}$/, '')
   s = s.replace(/\s+(lk|lka|sri\s*lanka|colombo\s*\d{1,2})$/i, '')
+  // phone numbers and country codes: "GOOGLE ONE 650-2530000 US", "MOBITEL (PVT) LTD 0712755777 LK"
+  s = s.replace(/\s+(LK|US|SE|IE|GB|UK|SG|IN|AE|AU|NL|DE|FR|HK|CA|JP|LU|CY|MT)$/i, '')
+  s = s.replace(/\s+\+?\d[\d\s-]{6,}\d$/, '')
   // store / terminal codes at the end: "UBER EATS 852" → "UBER EATS"
   s = s.replace(/(\s+#?\d{2,8})+$/, '')
   // payment-processor codes: "SPOTIFY P2F3", "UBER *TRIP X7Q2"
-  s = s.replace(/(\s+(?=[a-z*]*\d)(?=\d*[a-z])[a-z0-9*]{3,8})+$/i, '').replace(/\s*\*\s*\w*$/, '')
+  s = s.replace(/\s+(LK|US|SE|IE|GB|UK|SG|IN|AE|AU|NL|DE|FR|HK|CA|JP|LU|CY|MT)$/i, '')
+  // processor code (+ the city after it): "SPOTIFY P47EA6D4BC STOCKHOLM" → "SPOTIFY"
+  s = s.replace(/\s+(?=[a-z*]*\d)(?=\d*[a-z])[a-z0-9*]{3,12}(\s+[a-z]+)?$/i, '').replace(/\*\s*$/, '')
   s = s.replace(/\s{2,}/g, ' ').trim()
   if (s.length < 2) return null
   if (/^(your|a\/c|ac\b|acc|account|card|crd|cardholder|customer|x{2,}|\*|\d|lkr|rs\.?\b|usd|any\b|more\b|info|inquir|enquir|further|details|banking|us\b|inq|enq|call\b|get\b|for\b)/i.test(s)) return null
@@ -265,6 +270,9 @@ export function isSensitive(text: string): boolean {
   return SENSITIVE.some((r) => r.test(text))
 }
 
+/** Wording that only a real transaction alert uses. */
+const STRONG = /(debited|credited|purchase (at|of)|withdrawal (at|of)|cash withdrawal|transaction (approved|of)|\btxn (of|at)|auth(orised|orized)? pmt|paid to|transferred|transfer (to|from|of)|payment of|has been (debited|credited|authori[sz]ed)|deposit(ed)? (to|of|in)|used for|spent|ceft|slips)/i
+
 const BANKISH = /(debit|credit|card|a\/c|\bacc?\b|account|purchase|transaction|\btxn|withdraw|transfer|payment|\bpmt\b|deposit|remittance|balance|\bbal\b|\bavl|authori[sz]ed|approved|ceft|slips)/i
 
 /** Same rule as the server: an amount AND bank wording. "Bring Rs.500 for the cake" is not a bank alert. */
@@ -307,6 +315,14 @@ export function parseSms(body: string, sender: string | null, received: Date = n
 
   if (!BANKISH.test(text)) return { kind: 'ignore', reason: 'Not a bank alert' }
 
+  // Who sent it? Telecoms, shops and apps (SLT-Mobitel, Pizza Hut…) are never bank alerts, even when
+  // they mention rupees. Phone numbers / unknown senders must read like a real transaction.
+  const senderBank = sender ? BANKS.find((b) => b.match.test(sender) || b.code.toLowerCase() === sender.toLowerCase()) ?? null : null
+  const phoneSender = !!sender && /^\+?[\d\s-]{6,}$/.test(sender)
+  const strong = STRONG.test(text)
+  if (sender && !senderBank && !phoneSender) return { kind: 'ignore', reason: `Not from a bank (${sender})` }
+  if ((!sender || phoneSender) && !strong) return { kind: 'ignore', reason: 'Not a transaction alert' }
+
   const money = findMoney(text)
   const amounts = money.filter((m) => m.label === 'amount')
   const { dir } = findDirection(lower)
@@ -321,7 +337,8 @@ export function parseSms(body: string, sender: string | null, received: Date = n
     // Only a balance is mentioned, e.g. "Your balance is LKR 5,000"
     return { kind: 'fail', reason: 'Balance-only message' }
   }
-  if (!dir && promo) return { kind: 'ignore', reason: 'Promotion' }
+  // Bank marketing ("Pay Bills. Collect Cashback! … up to Rs1,500") has no real transaction verb.
+  if (promo && (!dir || !strong)) return { kind: 'ignore', reason: 'Promotion' }
 
   const main = amounts[0]
   const lkrEquivalent = main.currency !== 'LKR' ? amounts.find((m) => m.index > main.index && m.currency === 'LKR') ?? null : null
